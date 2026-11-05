@@ -68,6 +68,17 @@ python -m unittest discover -s tests -v
 
 The commands require the engine dependencies. `trace` uses native Potrace, while `refine` and `audit` do not. The original raster is always the ground truth; a failing quality gate is **not** reported as success.
 
+## Install the Python CLI locally
+
+After installing the native Potrace/Cairo dependencies (see [installation](docs/INSTALL.md)):
+
+```sh
+python -m pip install -e .
+raster-2-vector doctor
+```
+
+This is a local package; it is **not** published to PyPI.
+
 ## Supported agent clients
 
 This follows the portable [Agent Skills specification](https://agentskills.io/specification). The optional Python installer provides explicit paths for **Codex, Claude Code, Cursor, OpenCode, Gemini CLI, GitHub Copilot, Hermes Agent, and OpenClaw**. The skills CLI targets more. **File installation tests do not prove runtime execution by each agent.** See the [compatibility matrix](docs/COMPATIBILITY.md).
