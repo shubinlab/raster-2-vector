@@ -48,7 +48,7 @@ def install(platform: str, scope: str = "user", project_dir: Path | None = None,
         if dest.exists():shutil.rmtree(dest)
         dest.parent.mkdir(parents=True,exist_ok=True)
         shutil.copytree(ROOT,dest,ignore=shutil.ignore_patterns(
-            ".git",".venv","venv","__pycache__","*.pyc",".DS_Store",".pytest_cache"))
+            ".git",".venv","venv","__pycache__","*.pyc",".DS_Store",".pytest_cache",".agents",".claude",".cursor",".copilot",".gemini",".hermes",".openclaw",".config","skills"))
         installed.append(dest)
     return installed
 
