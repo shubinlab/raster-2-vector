@@ -1,0 +1,3 @@
+interface:
+  display_name: "raster-2-vector"
+  short_description: "Typography-aware raster logo tracing, SVG simplification and verified overlays"
