@@ -171,10 +171,23 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
 def doctor():
     import importlib.util,shutil,ctypes.util
     mods={n:bool(importlib.util.find_spec(n)) for n in ['PIL','numpy','cv2','scipy','cairosvg']}
-    library=ctypes.util.find_library('potrace') or '/usr/lib/x86_64-linux-gnu/libpotrace.so.0'
-    lib_exists=Path(library).exists() if '/' in library else bool(library)
-    return {'python':sys.version.split()[0],'dependencies':mods,'libpotrace':library if lib_exists else 'missing (trace unavailable)',
-            'scour':shutil.which('scour'),'inkscape':shutil.which('inkscape'),'ready_refine':all(mods.values()),'ready_trace':all(mods.values()) and lib_exists}
+    import ctypes,os
+    candidates=[os.environ.get('POTRACE_LIB_PATH'),ctypes.util.find_library('potrace'),
+                '/opt/homebrew/lib/libpotrace.dylib','/usr/local/lib/libpotrace.dylib',
+                '/usr/lib/x86_64-linux-gnu/libpotrace.so.0',
+                '/usr/lib/aarch64-linux-gnu/libpotrace.so.0']
+    library=None
+    for candidate in candidates:
+        if not candidate:continue
+        try:
+            ctypes.CDLL(candidate)
+            library=candidate
+            break
+        except OSError:pass
+    return {'python':sys.version.split()[0],'dependencies':mods,
+            'libpotrace':library or 'missing (trace unavailable)',
+            'scour':shutil.which('scour'),'inkscape':shutil.which('inkscape'),
+            'ready_refine':all(mods.values()),'ready_trace':all(mods.values()) and bool(library)}
 
 
 def main(argv=None):
