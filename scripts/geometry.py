@@ -92,7 +92,7 @@ def serial(segs:list[dict],precision:int=0)->str:
             p=s['p'];last_c2=None
         elif k=='C':
             pts=np.r_[s['p1']-p,s['p2']-p,s['p']-p]
-            if last_c2 is not None and np.linalg.norm(s['p1']-(2*p-last_c2))<0.49*10**(-precision):
+            if last_c2 is not None and np.linalg.norm(s['p1']-(2*p-last_c2))<1e-8:
                 cmd='s';v=np.r_[s['p2']-p,s['p']-p]
             else:cmd='c';v=pts
             p=s['p'];last_c2=s['p2']
@@ -210,3 +210,38 @@ def simplify_options(segs, max_err=1.4, max_join_angle=5):
 def suspicious_joins(segs):
     # Only seams intended to be smooth; deliberate corners must be considered manually.
     return [(i,round(angle(a,b),2)) for i,(a,b) in enumerate(zip(segs,segs[1:])) if a['kind']=='C' and b['kind']=='C' and angle(a,b)>3 and angle(a,b)<60]
+
+
+def seam_risks(segs, threshold=3.0, intentional_corner=70.0):
+    """Detect likely accidental G1 discontinuities, not intentional sharp tips.
+
+    Each report includes the join location. Z/M boundaries and SVG arcs cannot
+    be judged with these cubic/line tangent vectors and require visual review.
+    """
+    issues=[]
+    for i,(a,b) in enumerate(zip(segs,segs[1:])):
+        if a['kind'] not in ('L','C') or b['kind'] not in ('L','C'):
+            continue
+        if np.linalg.norm(a['p']-b['p0'])>1e-5:
+            continue
+        deg=angle(a,b)
+        if threshold<deg<intentional_corner:
+            issues.append({'index':i,'x':float(a['p'][0]),'y':float(a['p'][1]),
+                           'angle_deg':round(deg,3)})
+    return issues
+
+
+def new_kinks(before, after, spatial_tolerance=1.5, angle_tolerance=1.5):
+    """Return only *new or worsened* non-sharp seams.
+
+    Do not mistake pre-existing designer-intended corners for regression.
+    A candidate must not turn a smooth join into a kink, including after
+    SVG coordinate rounding/serializing. Compare actual parsed SVG paths.
+    """
+    old=seam_risks(before)
+    problems=[]
+    for issue in seam_risks(after):
+        near=[x for x in old if math.hypot(x['x']-issue['x'],x['y']-issue['y'])<=spatial_tolerance]
+        if not near or issue['angle_deg']>min(x['angle_deg'] for x in near)+angle_tolerance:
+            problems.append(issue)
+    return problems

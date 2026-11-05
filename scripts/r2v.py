@@ -19,8 +19,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from geometry import compact_svg,draw_count,load_one_path,simplify_options,suspicious_joins
-from quality import foreground,mask_from_svg,iou,qa,previews
+from geometry import compact_svg,draw_count,load_one_path,simplify_options,suspicious_joins,seam_risks,new_kinks
+from quality import foreground,mask_from_svg,iou,qa,previews,component_regressions,component_ious
 
 
 def verify_candidate(svg,source_mask,target_iou,strict_topology=True):
@@ -33,22 +33,38 @@ def verify_candidate(svg,source_mask,target_iou,strict_topology=True):
     return True,score
 
 
-def simplify_document(input_svg,source_mask,min_iou=.95,max_err=1.2,max_join_angle=5,
+def simplify_document(input_svg,source_mask,min_iou=.95,max_err=.8,max_join_angle=3,
                       passes=5,per_pass=12,allow_topology_change=False):
-    segments,info=load_one_path(input_svg)
-    candidates=[(input_svg,'unchanged',None)]
-    # Precision 0 should not be assumed safe: every candidate is rasterized.
+    """Minimize a path without introducing new wing/lettering defects.
+
+    The quality baseline is the actual input SVG versus the ORIGINAL raster.
+    Both whole-mask and per-connected-component comparisons are enforced.
+    Tangent checks run on parsed *serialized* SVG, not idealized floats.
+    """
+    initial_segments,info=load_one_path(input_svg)
+    original_mask=mask_from_svg(input_svg,source_mask.shape)
+    candidates=[(input_svg,'unchanged')]
     for precision in (0,1,2):
-        svg=compact_svg(segments,info,precision)
-        if svg!=input_svg:candidates.append((svg,f'canonical_p{precision}',segments))
-    scored=[]
-    for svg,reason,s in candidates:
-        valid,score=verify_candidate(svg,source_mask,min_iou,not allow_topology_change)
-        scored.append({'reason':reason,'bytes':len(svg.encode()),'iou':score,'passes':valid})
-    valid=[(svg,reason,s) for (svg,reason,s),stat in zip(candidates,scored) if stat['passes']]
-    if not valid:raise ValueError('Source SVG fails the quality/topology gate. Use --aesthetic-override only after visual approval, or reduce --min-iou explicitly.')
-    active,reason,seg=min(valid,key=lambda a:len(a[0].encode()))
-    if seg is None:seg=segments
+        svg=compact_svg(initial_segments,info,precision)
+        if svg!=input_svg:candidates.append((svg,f'canonical_p{precision}'))
+    scored=[];valid=[]
+    for svg,reason in candidates:
+        ok,score=verify_candidate(svg,source_mask,min_iou,not allow_topology_change)
+        if ok:
+            cand_mask=mask_from_svg(svg,source_mask.shape)
+            regress=component_regressions(source_mask,original_mask,cand_mask)
+            kinks=new_kinks(initial_segments,load_one_path(svg)[0])
+            ok=not regress and not kinks
+        else:
+            regress=[];kinks=[]
+        scored.append({'reason':reason,'bytes':len(svg.encode()),'iou':score,
+                       'passes':ok,'wing_detail_regressions':regress,'new_kinks':kinks})
+        if ok:valid.append((svg,reason))
+    if not valid:
+        raise ValueError('Original SVG fails raster/topology/smoothness gate. '
+                         'Do not simplify; improve the input geometry and audit it.')
+    active,reason=min(valid,key=lambda a:len(a[0].encode()))
+    seg=load_one_path(active)[0]
     history=[]
     for iteration in range(passes):
         base_bytes=len(active.encode());options=[]
@@ -57,20 +73,37 @@ def simplify_document(input_svg,source_mask,min_iou=.95,max_err=1.2,max_join_ang
             svg=compact_svg(sample,info,precision=0)
             saved=base_bytes-len(svg.encode())
             if saved<=0:continue
-            options.append((saved,err,i,j,sample,svg))
+            # IMPORTANT: a quantized file may have different tangents from the
+            # in-memory cubic. Refuse newly introduced visible joins.
+            candidate_segments=load_one_path(svg)[0]
+            if new_kinks(seg,candidate_segments):continue
+            if new_kinks(initial_segments,candidate_segments):continue
+            options.append((saved,err,i,j,candidate_segments,svg))
         options.sort(key=lambda a:(-a[0],a[1]))
         best=None
-        # Fast shortlist: geometry screened without rendering; full raster QA only for top N.
         for saved,err,i,j,cseg,csvg in options[:per_pass]:
-            valid,score=verify_candidate(csvg,source_mask,min_iou,not allow_topology_change)
-            if valid:
-                key=(len(csvg.encode()),-score,err)
-                if best is None or key<best[0]:best=(key,cseg,csvg,saved,err,score,i,j)
+            ok,score=verify_candidate(csvg,source_mask,min_iou,not allow_topology_change)
+            if not ok:continue
+            cand_mask=mask_from_svg(csvg,source_mask.shape)
+            if component_regressions(source_mask,original_mask,cand_mask):
+                continue
+            # Fewer kinks are preferable to a few bytes. Never allow new ones.
+            quality_key=(len(seam_risks(cseg)),len(csvg.encode()),-score,err)
+            if best is None or quality_key<best[0]:
+                best=(quality_key,cseg,csvg,saved,err,score,i,j)
         if best is None:break
         _,seg,active,saved,err,score,i,j=best
-        history.append({'pass':iteration+1,'removed':j-i-1,'bytes_saved':saved,'max_curve_error_px':round(err,3),'iou':round(score,6)})
-    return active,{'attempts':len(candidates),'initial_candidates':scored,'simplification':history,
-                   'geometry':draw_count(seg),'suspicious_curve_joins':suspicious_joins(seg)}
+        history.append({'pass':iteration+1,'removed':j-i-1,'bytes_saved':saved,
+                        'max_curve_error_px':round(err,3),'iou':round(score,6)})
+    final_mask=mask_from_svg(active,source_mask.shape)
+    return active,{'attempts':len(candidates),'initial_candidates':scored,
+                   'simplification':history,'geometry':draw_count(seg),
+                   'suspicious_curve_joins':suspicious_joins(seg),
+                   'smoothness_risks':seam_risks(seg),
+                   'component_ious':component_ious(source_mask,final_mask),
+                   'protected_reference':'original raster and original SVG',
+                   'gate':'no newly introduced tangent kinks or feature IoU regression'}
+
 
 
 def ellipse_hybrid(mask, fill):
@@ -164,6 +197,13 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
                  'aesthetic_override':bool(aesthetic_override and (not pass_iou or not pass_topo)),
                  'source_mask':ref_info,'files':{'svg':str(out),'png':str(png),'overlay':str(overlay)},
                  'notes':'IoU is raster silhouette agreement, not a typography aesthetics rating'})
+    try:
+        segments,_=load_one_path(svg)
+        stat['smoothness_risks']=seam_risks(segments)
+        stat['manual_join_review_recommended']=bool(stat['smoothness_risks'])
+    except ValueError:
+        stat['smoothness_risks']='unsupported SVG structure; review manually'
+        stat['manual_join_review_recommended']=True
     if details:stat['process']=details
     return stat
 
@@ -209,8 +249,8 @@ def main(argv=None):
             c.add_argument('--mode',choices=['fast','quality'],default='fast')
             c.add_argument('--goal',choices=['size','balanced','fidelity'],default='balanced')
         if name=='refine':
-            c.add_argument('--max-curve-error',type=float,default=1.2)
-            c.add_argument('--max-join-angle',type=float,default=5.0)
+            c.add_argument('--max-curve-error',type=float,default=.8)
+            c.add_argument('--max-join-angle',type=float,default=3.0)
             c.add_argument('--passes',type=int,default=5)
             c.add_argument('--per-pass',type=int,default=12)
     args=p.parse_args(argv)
