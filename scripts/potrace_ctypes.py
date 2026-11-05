@@ -18,7 +18,27 @@ class Progress(C.Structure):
     _fields_=[('callback',C.c_void_p),('data',C.c_void_p),('min',C.c_double),('max',C.c_double),('epsilon',C.c_double)]
 class Param(C.Structure):
     _fields_=[('turdsize',C.c_int),('turnpolicy',C.c_int),('alphamax',C.c_double),('opticurve',C.c_int),('opttolerance',C.c_double),('progress',Progress)]
-lib=C.CDLL(ctypes.util.find_library('potrace') or '/usr/lib/x86_64-linux-gnu/libpotrace.so.0')
+# Look for the native library on Linux, Apple Silicon/Intel macOS, or a user-specified path.
+import os
+_CANDIDATES=[
+    os.environ.get('POTRACE_LIB_PATH'),
+    ctypes.util.find_library('potrace'),
+    '/opt/homebrew/lib/libpotrace.dylib',
+    '/usr/local/lib/libpotrace.dylib',
+    '/usr/lib/x86_64-linux-gnu/libpotrace.so.0',
+    '/usr/lib/aarch64-linux-gnu/libpotrace.so.0',
+    'libpotrace.so.0',
+    'libpotrace.dylib',
+]
+lib=None
+for _candidate in _CANDIDATES:
+    if not _candidate:continue
+    try:
+        lib=C.CDLL(_candidate)
+        break
+    except OSError:pass
+if lib is None:
+    raise RuntimeError('Native libpotrace is missing. Install it or set POTRACE_LIB_PATH; use Docker on Windows.')
 lib.potrace_param_default.restype=C.POINTER(Param)
 lib.potrace_param_free.argtypes=[C.POINTER(Param)]
 lib.potrace_trace.argtypes=[C.POINTER(Param),C.POINTER(Bitmap)]
