@@ -58,7 +58,7 @@ Ubuntu/Debian:
 sudo apt-get update
 sudo apt-get install -y python3-venv python3-pip libpotrace0 libcairo2
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .
 .venv/bin/python scripts/r2v.py doctor
 .venv/bin/python -m unittest discover -s tests -v
 ```
@@ -70,7 +70,7 @@ For other distros, install shared `libpotrace` and Cairo using the distro packag
 ```sh
 brew install python potrace cairo
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .
 .venv/bin/python scripts/r2v.py doctor
 .venv/bin/python -m unittest discover -s tests -v
 ```
@@ -91,3 +91,14 @@ python scripts/r2v.py audit source.png existing.svg --out verified.svg
 ```
 
 Each successful run delivers exactly `result.svg`, `result.png` and `result_overlay.png`. JSON statistics are printed to stdout. Existing source SVG files cannot be overwritten by `refine` and `audit`. Quality is checked against the original raster.
+
+## Python package alternative
+
+On supported native environments (after installing Cairo and libpotrace):
+
+```sh
+python -m pip install -e .
+raster-2-vector doctor
+```
+
+This repo exposes the `raster-2-vector` CLI entry point. It has **not been published to PyPI**, so use a local clone or a Git URL, not `pip install raster-2-vector` from the public index.
