@@ -54,7 +54,7 @@ Windows PowerShell also supports `"${PWD}:/work"` in a Docker volume argument. N
 | `result.png` | Rendered SVG preview |
 | `result_overlay.png` | Raster comparison: **white** = common, **red** = missing, **cyan** = extra |
 
-The program measures IoU, boundary error, missed/extra pixels, component/hole topology, SVG bytes and segment counts. It **cannot automatically prove aesthetic quality**; a human or visual agent must review the result.
+The program measures overall **and per-component IoU** (small wing detail cannot hide behind a large glyph), boundary error, missed/extra pixels, component/hole topology, **SVG join-angle risks**, bytes and segment counts. During `refine`, freshly introduced tangent kinks and material per-component fidelity regressions are hard rejected **after serialization**. It **cannot automatically prove aesthetic quality**; a human or visual agent must still review intentional corners, wing roots, and the overlay.
 
 ## Commands
 
