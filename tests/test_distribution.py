@@ -27,6 +27,21 @@ class DistributionTests(unittest.TestCase):
             paths=mod.install("all",scope="project",project_dir=Path(d))
             self.assertEqual(len(paths),len(set(paths)))
             self.assertGreaterEqual(len(paths),2)
+    def test_install_into_source_repo_no_recursion(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            (root/"SKILL.md").write_text("---\\nname: raster-2-vector\\n---\\n")
+            (root/"scripts").mkdir()
+            (root/"scripts"/"r2v.py").write_text("# dummy")
+            old_root=mod.ROOT
+            mod.ROOT=root
+            try:
+                paths=mod.install("codex",scope="project",project_dir=root)
+                self.assertTrue((paths[0]/"SKILL.md").is_file())
+                self.assertFalse((paths[0]/".agents").exists())
+            finally:
+                mod.ROOT=old_root
+
     def test_refuse_overwrite(self):
         with tempfile.TemporaryDirectory() as d:
             mod.install("codex",scope="user",home=Path(d))
