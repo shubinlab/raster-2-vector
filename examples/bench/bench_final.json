@@ -1,0 +1,59 @@
+{
+  "method": "Both runners operate on same raster; target IoU 95%, threshold 128. Elapsed includes Python startup on this container. Single run only.",
+  "results": [
+    {
+      "sample": "sample_geometric",
+      "pipeline": "old",
+      "elapsed_sec": 2.584,
+      "svg_bytes": 1062,
+      "iou_pct": 99.716,
+      "p95_boundary_px": 0.0,
+      "topology_ok": true
+    },
+    {
+      "sample": "sample_geometric",
+      "pipeline": "raster-2-vector",
+      "elapsed_sec": 1.488,
+      "svg_bytes": 668,
+      "iou_pct": 99.517,
+      "p95_boundary_px": 0.0,
+      "topology_ok": true
+    },
+    {
+      "sample": "sample_lato",
+      "pipeline": "old",
+      "elapsed_sec": 2.704,
+      "svg_bytes": 1809,
+      "iou_pct": 96.117,
+      "p95_boundary_px": 1.0,
+      "topology_ok": true
+    },
+    {
+      "sample": "sample_lato",
+      "pipeline": "raster-2-vector",
+      "elapsed_sec": 1.468,
+      "svg_bytes": 1572,
+      "iou_pct": 97.444,
+      "p95_boundary_px": 1.0,
+      "topology_ok": true
+    },
+    {
+      "sample": "sample_serif",
+      "pipeline": "old",
+      "elapsed_sec": 2.538,
+      "svg_bytes": 3621,
+      "iou_pct": 95.194,
+      "p95_boundary_px": 1.0,
+      "topology_ok": true
+    },
+    {
+      "sample": "sample_serif",
+      "pipeline": "raster-2-vector",
+      "elapsed_sec": 1.472,
+      "svg_bytes": 1757,
+      "iou_pct": 96.639,
+      "p95_boundary_px": 1.0,
+      "topology_ok": true
+    }
+  ]
+}
