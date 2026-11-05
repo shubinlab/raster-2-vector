@@ -71,6 +71,38 @@ def topology(mask,small=10):
     return {'components':components,'holes':holes}
 
 
+
+def component_ious(ref,out,min_area=30,padding=2):
+    """Per-feature IoU. A small wing must not be masked by a large glyph.
+
+    Component IDs are assigned on the immutable reference raster. Every
+    candidate is scored against the same fixed windows, so relative changes
+    remain comparable even if connected-component geometry shifts.
+    """
+    fg=np.asarray(ref,dtype=np.uint8)
+    n,labels,stats,_=cv2.connectedComponentsWithStats(fg,8)
+    h,w=ref.shape
+    scores=[]
+    for k in range(1,n):
+        x,y,cw,ch,area=map(int,stats[k])
+        if area<min_area:continue
+        x0=max(0,x-padding);y0=max(0,y-padding)
+        x1=min(w,x+cw+padding);y1=min(h,y+ch+padding)
+        r=ref[y0:y1,x0:x1];v=out[y0:y1,x0:x1]
+        scores.append({'component':int(k),'area':area,
+                       'bbox':[x,y,x+cw,y+ch],'iou':round(iou(r,v),6)})
+    return scores
+
+
+def component_regressions(ref,baseline,candidate,tolerance=.008):
+    """Return features whose mask agreement gets materially worse."""
+    base=component_ious(ref,baseline)
+    new=component_ious(ref,candidate)
+    return [{'component':a['component'],'previous_iou':a['iou'],
+             'candidate_iou':b['iou'],'area':a['area']}
+            for a,b in zip(base,new) if b['iou']+tolerance<a['iou']]
+
+
 def qa(ref,out,with_boundary=True,regions=None):
     ans={'iou':round(iou(ref,out),6),'missing_pixels':int(np.count_nonzero(ref & ~out)),
          'extra_pixels':int(np.count_nonzero(out & ~ref)),
@@ -79,6 +111,9 @@ def qa(ref,out,with_boundary=True,regions=None):
          'svg_foreground_pixels':int(np.count_nonzero(out))}
     ans['reference_topology']=topology(ref);ans['svg_topology']=topology(out)
     ans['topology_preserved']=(ans['reference_topology']==ans['svg_topology'])
+    parts=component_ious(ref,out)
+    ans['component_ious']=parts
+    ans['min_component_iou']=min((x['iou'] for x in parts),default=1.0)
     if with_boundary:
         kr=np.ones((3,3),np.uint8)
         e1=(ref&~cv2.erode(ref.astype('uint8'),kr).astype(bool))
