@@ -6,6 +6,13 @@ description: Reconstruct or refine raster logos, lettering, wordmarks, glyphs, a
 
 **Objective:** produce the simplest *visually correct* geometry, not the greatest pixel IoU or the smallest byte count at any cost. Prefer a valid typographic line, coherent bowl, counter, spacing, and tangent over tracing raster noise. Never claim aesthetic perfection by IoU alone.
 
+## Runtime selection (cross-platform)
+
+This is a portable Agent Skill, not an embedded Python runtime. Installing it through `npx skills` or a manual agent folder only installs instructions and scripts. Before invoking the engine, locate the skill directory and choose:
+1. An already configured Python environment with `requirements.txt` installed and working Potrace/Cairo; run `python scripts/r2v.py doctor`.
+2. Otherwise the documented Docker engine: build `docker build -t raster-2-vector .` from this repository, then run `docker run --rm -v "${PWD}:/work" -w /work raster-2-vector ...` with input/output in the mounted directory.
+3. Do not claim universal execution solely from agent instruction discovery. If the engine is missing, state the install dependency and point to `docs/INSTALL.md`.
+
 ## Execution policy
 1. Find the **original raster** in the current conversation or attached files. Never compare only with a previous SVG. Check whether a previous **approved SVG** is available: refine it rather than restart tracing.
 2. Run `python scripts/r2v.py doctor`. Inspect raster polarity, background, counters, intended corners, glyph boundaries. If the drawing is a logo/wordmark, consult `references/typography.md` only when reconstructing or editing glyph geometry.
