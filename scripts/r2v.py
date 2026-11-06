@@ -155,10 +155,13 @@ def ellipse_hybrid(mask, fill):
     svg=compact_svg(full,{'viewBox':f'0 0 {w} {h}','fill':fill,'fill-rule':'evenodd'},1)
     return svg,ellipses
 
-def trace_document(src_mask,foreground_color='#fff',mode='fast'):
+def trace_document(src_mask,foreground_color='#fff',mode='fast',goal='balanced'):
     from potrace_ctypes import trace
     h,w=src_mask.shape
     presets=[(1.,.5),(1.,1.2),(1.,.2)]
+    # Long smooth curves for compact geometry; accept only after source-raster QA.
+    # Increasing opttolerance is optional and never relaxes the 95% / topology gates.
+    if goal in ('balanced','size'):presets += [(1.,1.8),(1.,2.5)]
     if mode=='quality':presets += [(0.65,.3),(1.25,.3),(1.25,.8),(0.65,1.2)]
     results=[]
     info={'viewBox':f'0 0 {w} {h}','fill':foreground_color,'fill-rule':'evenodd'}
@@ -269,7 +272,7 @@ def main(argv=None):
     mask,sourceinfo,rgb=foreground(source,args.threshold,args.polarity)
     if args.command=='trace':
         color='#fff' if sourceinfo['polarity']=='light' else '#000'
-        options=trace_document(mask,color,args.mode)
+        options=trace_document(mask,color,args.mode,args.goal)
         from quality import topology
         source_topology=topology(mask)
         eligible=[]
