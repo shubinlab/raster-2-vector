@@ -3,3 +3,4 @@ numpy>=1.26
 opencv-python-headless>=4.8
 scipy>=1.11
 CairoSVG>=2.7
+scour>=0.38
