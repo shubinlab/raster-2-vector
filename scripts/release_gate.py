@@ -67,7 +67,6 @@ def new_seams(before:str,after:str,px_tolerance=1.5):
     return result
 
 
-
 def component_regressions(reference, baseline, candidate, tolerance=.008, min_area=25, pad=3):
     """Stable source-component windows, independent of runtime's quality version."""
     import cv2
