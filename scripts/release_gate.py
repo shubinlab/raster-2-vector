@@ -16,7 +16,7 @@ def source_canvas_check(svg: str, shape, tolerance: float=.005):
     root=ET.fromstring(svg)
     raw=root.get('viewBox')
     if raw is None:raise ValueError('SOURCE_SPACE_MISMATCH: SVG is missing viewBox')
-    vals=[float(v) for v in re.split(r'[\\s,]+',raw.strip())]
+    vals=[float(v) for v in re.split(r'[\s,]+',raw.strip())]
     if len(vals)!=4 or min(vals[2:])<=0:
         raise ValueError('SOURCE_SPACE_MISMATCH: malformed viewBox')
     h,w=shape
