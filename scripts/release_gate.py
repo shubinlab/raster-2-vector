@@ -9,7 +9,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from geometry import load_one_path,angle
-from quality import foreground,mask_from_svg,qa,component_regressions
+from quality import foreground,mask_from_svg,qa
 
 
 def source_canvas_check(svg: str, shape, tolerance: float=.005):
@@ -66,6 +66,29 @@ def new_seams(before:str,after:str,px_tolerance=1.5):
             result.append(issue)
     return result
 
+
+
+def component_regressions(reference, baseline, candidate, tolerance=.008, min_area=25, pad=3):
+    """Stable source-component windows, independent of runtime's quality version."""
+    import cv2
+    import numpy as np
+    n, labels, stats, _=cv2.connectedComponentsWithStats(reference.astype('uint8'),8)
+    h,w=reference.shape
+    out=[]
+    for k in range(1,n):
+        x,y,ww,hh,area=map(int,stats[k])
+        if area<min_area:continue
+        x0=max(0,x-pad);x1=min(w,x+ww+pad)
+        y0=max(0,y-pad);y1=min(h,y+hh+pad)
+        r=reference[y0:y1,x0:x1]
+        old=baseline[y0:y1,x0:x1];new=candidate[y0:y1,x0:x1]
+        def score(v):
+            union=int((r|v).sum())
+            return int((r&v).sum())/union if union else 1.
+        before,after=score(old),score(new)
+        if after+tolerance<before:
+            out.append({'component':k,'area':area,'before':round(before,6),'after':round(after,6)})
+    return out
 
 def gate(source,original_svg:str,candidate_svg:str,minimum=.95,feature_drop=.008):
     ref,_,_=foreground(source)
