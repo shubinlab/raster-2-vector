@@ -155,10 +155,13 @@ def ellipse_hybrid(mask, fill):
     svg=compact_svg(full,{'viewBox':f'0 0 {w} {h}','fill':fill,'fill-rule':'evenodd'},1)
     return svg,ellipses
 
-def trace_document(src_mask,foreground_color='#fff',mode='fast'):
+def trace_document(src_mask,foreground_color='#fff',mode='fast',goal='balanced'):
     from potrace_ctypes import trace
     h,w=src_mask.shape
     presets=[(1.,.5),(1.,1.2),(1.,.2)]
+    # Long smooth curves for compact geometry; accept only after source-raster QA.
+    # Increasing opttolerance is optional and never relaxes the 95% / topology gates.
+    if goal in ('balanced','size'):presets += [(1.,1.8),(1.,2.5)]
     if mode=='quality':presets += [(0.65,.3),(1.25,.3),(1.25,.8),(0.65,1.2)]
     results=[]
     info={'viewBox':f'0 0 {w} {h}','fill':foreground_color,'fill-rule':'evenodd'}
@@ -180,12 +183,21 @@ def trace_document(src_mask,foreground_color='#fff',mode='fast'):
 def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_topology_change=False,aesthetic_override=False,details=None):
     out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)
     ref,ref_info,_=foreground(source,threshold,polarity)
+    from release_gate import source_canvas_check,safe_minify
+    # Strict source coordinates: never rescale vector foreground to match the bitmap.
+    source_canvas_check(svg,ref.shape)
+    svg,optimized=safe_minify(source,svg,threshold=min_iou)
     cand=mask_from_svg(svg,ref.shape)
     stat=qa(ref,cand,True)
     pass_iou=stat['iou']>=min_iou
+    local_iou=stat.get('min_component_iou',1.0)
+    # A large body must not hide a damaged small wing, dot, or counter.
+    pass_local=local_iou>=min_iou
     pass_topo=stat['topology_preserved'] or allow_topology_change
     if not pass_iou and not aesthetic_override:raise ValueError(f'IoU {stat["iou"]:.4f} below {min_iou:.4f}; keep existing SVG. Set --aesthetic-override only for a visually approved typography tradeoff.')
     if not pass_topo and not aesthetic_override:raise ValueError('Contour topology changed unexpectedly. No output written.')
+    if not pass_local and not aesthetic_override:
+        raise ValueError(f'Small feature IoU {local_iou:.4f} below {min_iou:.4f}; SVG not written.')
     # Never overwrite a source SVG, even if caller mistakenly chooses same name.
     if Path(source).resolve()==out.resolve():raise ValueError('Do not overwrite original raster')
     out.write_text(svg,encoding='utf8')
@@ -193,7 +205,7 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
     overlay=out.with_name(out.stem+'_overlay.png')
     stat,ref_info=previews(svg,source,png,overlay,threshold,polarity)
     stat.update({'bytes':len(svg.encode()),'sha256':hashlib.sha256(svg.encode()).hexdigest(),
-                 'passes_iou':pass_iou,'passes_topology':pass_topo,
+                 'passes_iou':pass_iou,'passes_local_iou':pass_local,'passes_topology':pass_topo,
                  'aesthetic_override':bool(aesthetic_override and (not pass_iou or not pass_topo)),
                  'source_mask':ref_info,'files':{'svg':str(out),'png':str(png),'overlay':str(overlay)},
                  'notes':'IoU is raster silhouette agreement, not a typography aesthetics rating'})
@@ -204,6 +216,7 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
     except ValueError:
         stat['smoothness_risks']='unsupported SVG structure; review manually'
         stat['manual_join_review_recommended']=True
+    stat['verified_minification']=optimized
     if details:stat['process']=details
     return stat
 
@@ -264,7 +277,7 @@ def main(argv=None):
     mask,sourceinfo,rgb=foreground(source,args.threshold,args.polarity)
     if args.command=='trace':
         color='#fff' if sourceinfo['polarity']=='light' else '#000'
-        options=trace_document(mask,color,args.mode)
+        options=trace_document(mask,color,args.mode,args.goal)
         from quality import topology
         source_topology=topology(mask)
         eligible=[]

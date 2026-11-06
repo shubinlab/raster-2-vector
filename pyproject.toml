@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "raster-2-vector"
-version = "1.1.1"
+version = "1.2.0"
 description = "Typography-aware raster-to-SVG trace, refinement and verification CLI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,7 @@ dependencies = [
   "opencv-python-headless>=4.8",
   "scipy>=1.11",
   "CairoSVG>=2.7",
+  "scour>=0.38",
 ]
 keywords = ["agent-skills", "svg", "vectorization", "typography"]
 
@@ -21,7 +22,7 @@ keywords = ["agent-skills", "svg", "vectorization", "typography"]
 raster-2-vector = "r2v:main"
 
 [tool.setuptools]
-py-modules = ["r2v","geometry","quality","potrace_ctypes"]
+py-modules = ["r2v","geometry","quality","potrace_ctypes","release_gate"]
 
 [tool.setuptools.package-dir]
 "" = "scripts"

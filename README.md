@@ -66,7 +66,7 @@ python scripts/r2v.py audit source.png existing.svg --out verified.svg
 python -m unittest discover -s tests -v
 ```
 
-The commands require the engine dependencies. `trace` uses native Potrace, while `refine` and `audit` do not. The original raster is always the ground truth; a failing quality gate is **not** reported as success.
+The commands require the engine dependencies. `trace` uses native Potrace, while `refine` and `audit` do not. The original raster is always the ground truth; independent x/y foreground stretching is forbidden. A failing quality gate is **not** reported as success.
 
 ## Install the Python CLI locally
 
