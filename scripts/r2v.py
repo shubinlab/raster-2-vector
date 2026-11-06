@@ -180,6 +180,10 @@ def trace_document(src_mask,foreground_color='#fff',mode='fast'):
 def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_topology_change=False,aesthetic_override=False,details=None):
     out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)
     ref,ref_info,_=foreground(source,threshold,polarity)
+    from release_gate import source_canvas_check,safe_minify
+    # Strict source coordinates: never rescale vector foreground to match the bitmap.
+    source_canvas_check(svg,ref.shape)
+    svg,optimized=safe_minify(source,svg,threshold=min_iou)
     cand=mask_from_svg(svg,ref.shape)
     stat=qa(ref,cand,True)
     pass_iou=stat['iou']>=min_iou
@@ -204,6 +208,7 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
     except ValueError:
         stat['smoothness_risks']='unsupported SVG structure; review manually'
         stat['manual_join_review_recommended']=True
+    stat['verified_minification']=optimized
     if details:stat['process']=details
     return stat
 
