@@ -190,9 +190,14 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
     cand=mask_from_svg(svg,ref.shape)
     stat=qa(ref,cand,True)
     pass_iou=stat['iou']>=min_iou
+    local_iou=stat.get('min_component_iou',1.0)
+    # A large body must not hide a damaged small wing, dot, or counter.
+    pass_local=local_iou>=min_iou
     pass_topo=stat['topology_preserved'] or allow_topology_change
     if not pass_iou and not aesthetic_override:raise ValueError(f'IoU {stat["iou"]:.4f} below {min_iou:.4f}; keep existing SVG. Set --aesthetic-override only for a visually approved typography tradeoff.')
     if not pass_topo and not aesthetic_override:raise ValueError('Contour topology changed unexpectedly. No output written.')
+    if not pass_local and not aesthetic_override:
+        raise ValueError(f'Small feature IoU {local_iou:.4f} below {min_iou:.4f}; SVG not written.')
     # Never overwrite a source SVG, even if caller mistakenly chooses same name.
     if Path(source).resolve()==out.resolve():raise ValueError('Do not overwrite original raster')
     out.write_text(svg,encoding='utf8')
@@ -200,7 +205,7 @@ def save_three(svg,source,out,threshold=None,polarity='auto',min_iou=.95,allow_t
     overlay=out.with_name(out.stem+'_overlay.png')
     stat,ref_info=previews(svg,source,png,overlay,threshold,polarity)
     stat.update({'bytes':len(svg.encode()),'sha256':hashlib.sha256(svg.encode()).hexdigest(),
-                 'passes_iou':pass_iou,'passes_topology':pass_topo,
+                 'passes_iou':pass_iou,'passes_local_iou':pass_local,'passes_topology':pass_topo,
                  'aesthetic_override':bool(aesthetic_override and (not pass_iou or not pass_topo)),
                  'source_mask':ref_info,'files':{'svg':str(out),'png':str(png),'overlay':str(overlay)},
                  'notes':'IoU is raster silhouette agreement, not a typography aesthetics rating'})
