@@ -12,18 +12,29 @@ from geometry import load_one_path,angle
 from quality import foreground,mask_from_svg,qa
 
 
-def source_canvas_check(svg: str, shape, tolerance: float=.005):
+def source_canvas_check(svg: str, shape, tolerance: float=1e-6):
+    """Require the actual original pixel coordinate system, not just its ratio.
+
+    A shifted viewBox, uniformly scaled viewBox or a small anisotropic stretch
+    could previously pass the aspect-ratio-only check. All are forbidden here.
+    """
     root=ET.fromstring(svg)
+    if root.tag.rsplit('}',1)[-1]!='svg':
+        raise ValueError('SOURCE_SPACE_MISMATCH: root is not SVG')
     raw=root.get('viewBox')
-    if raw is None:raise ValueError('SOURCE_SPACE_MISMATCH: SVG is missing viewBox')
-    vals=[float(v) for v in re.split(r'[\s,]+',raw.strip())]
-    if len(vals)!=4 or min(vals[2:])<=0:
+    if raw is None:
+        raise ValueError('SOURCE_SPACE_MISMATCH: SVG is missing viewBox')
+    try:
+        vals=[float(v) for v in re.split(r'[\s,]+',raw.strip())]
+    except ValueError as exc:
+        raise ValueError('SOURCE_SPACE_MISMATCH: malformed viewBox') from exc
+    if len(vals)!=4 or not all(math.isfinite(v) for v in vals) or min(vals[2:])<=0:
         raise ValueError('SOURCE_SPACE_MISMATCH: malformed viewBox')
     h,w=shape
-    ratio=(vals[2]/vals[3])/(w/h)
-    if abs(ratio-1)>tolerance:
-        raise ValueError('SOURCE_SPACE_MISMATCH: no independent x/y resizing for IoU')
-    return ratio
+    expected=(0.,0.,float(w),float(h))
+    if any(abs(a-b)>tolerance*max(1.,abs(b)) for a,b in zip(vals,expected)):
+        raise ValueError('SOURCE_SPACE_MISMATCH: SVG viewBox must equal 0 0 source_width source_height')
+    return 1.0
 
 
 def curvature(segment,at_end:bool):

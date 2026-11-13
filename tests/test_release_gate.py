@@ -39,6 +39,28 @@ class StrictGeometryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'SOURCE_SPACE_MISMATCH'):
             source_canvas_check(svg('M0 0H240V10H0Z',999,10),shape)
 
+    def test_shifted_viewbox_rejected_even_when_ratio_matches(self):
+        with self.assertRaisesRegex(ValueError,'SOURCE_SPACE_MISMATCH'):
+            source_canvas_check(svg('M10 10H200V140H10Z').replace(
+                'viewBox="0 0 240 160"','viewBox="10 10 240 160"'),(160,240))
+
+    def test_uniformly_scaled_viewbox_rejected(self):
+        with self.assertRaisesRegex(ValueError,'SOURCE_SPACE_MISMATCH'):
+            source_canvas_check(svg('M10 10H200V140H10Z',480,320),(160,240))
+
+    def test_small_anisotropic_stretch_rejected(self):
+        with self.assertRaisesRegex(ValueError,'SOURCE_SPACE_MISMATCH'):
+            source_canvas_check(svg('M10 10H200V140H10Z').replace(
+                'viewBox="0 0 240 160"','viewBox="0 0 240.6 160"'),(160,240))
+
+    def test_nan_viewbox_rejected(self):
+        with self.assertRaisesRegex(ValueError,'SOURCE_SPACE_MISMATCH'):
+            source_canvas_check(svg('M10 10H200V140H10Z').replace(
+                'viewBox="0 0 240 160"','viewBox="0 0 NaN 160"'),(160,240))
+
+    def test_original_exact_canvas_is_accepted(self):
+        self.assertEqual(source_canvas_check(svg('M10 10H200V140H10Z'),(160,240)),1.)
+
     def test_small_wing_hidden_by_large_letter_is_rejected(self):
         original=svg('M8 8H170V150H8ZM186 23H217V35H186Z')
         corrupted=svg('M8 8H170V150H8ZM201 23H232V35H201Z')
